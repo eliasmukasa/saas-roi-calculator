@@ -68,23 +68,6 @@ Open [http://localhost:5173](http://localhost:5173) in your browser.
 
 ---
 
-## 📁 Project Structure
-
-```bash
-src/
-├── components/
-│   └── InputForm.tsx
-│   └── ResultCards.tsx
-│   └── Chart.tsx
-├── utils/
-│   └── calculations.ts
-│   └── exportHelpers.ts
-├── App.tsx
-├── main.tsx
-```
-
----
-
 ## 🧠 Learnings & Purpose
 
 This project is part of a personal portfolio aimed at showcasing real-world financial modeling with interactive UI. Perfect for:
