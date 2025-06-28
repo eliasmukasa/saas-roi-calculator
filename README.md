@@ -101,6 +101,8 @@ MIT
 
 ---
 
+**Disclaimer** | This is a personal portfolio project to demonstrate technical skill. It is not a financial analysis tool and should not be used for investment decisions. |
+
 ## ✍️ Author
 
 [Elias Kizito](https://eliaskizito.com) 
