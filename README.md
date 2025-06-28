@@ -2,7 +2,9 @@
 
 A sleek, interactive calculator to model the return on investment (ROI) for B2B SaaS products. Designed with React, Tailwind CSS, and Chart.js, this project combines financial logic with beautiful visualizations to help software buyers and sellers assess value at a glance.
 
-Live Demo: [Coming Soon]
+![Screenshot of the application](./screenshot.png)
+
+🚀 [Live Demo](https://saas-roi-calculator.netlify.app/)
 
 ---
 
