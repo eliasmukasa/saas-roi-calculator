@@ -32,12 +32,12 @@ const InputField: React.FC<InputFieldProps> = ({ label, icon: Icon, value, setVa
         value={value === 0 ? '' : value}
         title={label}
         onChange={(e: React.ChangeEvent<HTMLInputElement>) => setValue(parseFloat(e.target.value) || 0)}
-        className="block w-full rounded-md border-gray-600 bg-gray-700/50 py-3 pl-10 pr-4 text-white shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+        className="block w-full rounded-md border-gray-600 bg-gray-700/50 py-3 pl-10 pr-10 text-white shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" // Increased right padding
       />
       <span
         data-tooltip-id="tooltip"
         data-tooltip-content={`Info: ${label} – Enter the expected ${label.toLowerCase()} here.`}
-        className="absolute -right-6 top-1/2 transform -translate-y-1/2 text-xs text-gray-400 cursor-help"
+        className="absolute right-3 top-1/2 transform -translate-y-1/2 text-xs text-gray-400 cursor-help" // Adjusted right positioning
       >
         ⓘ
       </span>
@@ -75,7 +75,6 @@ export default function App() {
   const [timeToValue, setTimeToValue] = useState(3); // in months
 
   // --- DERIVED CALCULATIONS using useMemo for efficiency ---
-  // useMemo ensures calculations only re-run when inputs change.
   const calculations = useMemo(() => {
     const weeklySavingsPerUser = hoursSaved * hourlyRate;
     const totalWeeklySavings = weeklySavingsPerUser * numUsers;
@@ -109,7 +108,6 @@ export default function App() {
   const chartData = useMemo(() => {
     return [
       { name: 'Year 1', Cost: calculations.firstYearTotalCost, Savings: calculations.annualSavings, 'Net Value': calculations.annualSavings - calculations.firstYearTotalCost },
-      // The cost in subsequent years is just the license cost, not the total cost. This is the fix.
       { name: 'Year 2', Cost: calculations.annualLicenseCost, Savings: calculations.annualSavings, 'Net Value': calculations.annualNetValue },
       { name: 'Year 3', Cost: calculations.annualLicenseCost, Savings: calculations.annualSavings, 'Net Value': calculations.annualNetValue },
     ];
@@ -178,7 +176,6 @@ export default function App() {
                     <ComposedChart data={chartData} margin={{ top: 5, right: 20, left: 10, bottom: 5 }}>
                       <CartesianGrid strokeDasharray="3 3" stroke="#4A5568" />
                       <XAxis dataKey="name" stroke="#A0AEC0" />
-                      {/* By adding the correct type for the value, we resolve the TypeScript warning. */}
                       <YAxis 
                         stroke="#A0AEC0"
                         tickFormatter={(value: number) => {
@@ -197,9 +194,9 @@ export default function App() {
                         formatter={(value: number, name: string) => [`${formatCurrency(value)}`, name]}
                       />
                       <Legend wrapperStyle={{ color: '#A0AEC0' }} />
-                      <Bar dataKey="Cost" fill={costBarColor} name="Total Cost" isAnimationActive={true} />
-                      <Bar dataKey="Savings" fill={savingsBarColor} name="Total Savings" isAnimationActive={true} />
-                      <Line type="monotone" dataKey="Net Value" stroke={netValueLineColor} strokeWidth={3} name="Net Value" isAnimationActive={true} />
+                      <Bar dataKey="Cost" fill={costBarColor} name="Total Cost" />
+                      <Bar dataKey="Savings" fill={savingsBarColor} name="Total Savings" />
+                      <Line type="monotone" dataKey="Net Value" stroke={netValueLineColor} strokeWidth={3} />
                     </ComposedChart>
                   </ResponsiveContainer>
                 </div>
@@ -336,5 +333,3 @@ export default function App() {
     </div>
   );
 }
-
-
