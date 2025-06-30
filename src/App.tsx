@@ -196,7 +196,7 @@ export default function App() {
       ];
     }
 
-    const year1NetValue = calculations.firstYearAdjustedSavings - calculations.firstYearTotalCost;
+    const year1NetValue = (calculations.firstYearAdjustedSavings ?? 0) - (calculations.firstYearTotalCost ?? 0);
 
     return [
       { name: 'Year 1', Cost: calculations.firstYearTotalCost, Savings: calculations.firstYearAdjustedSavings, 'Net Value': year1NetValue },
