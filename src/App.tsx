@@ -1,9 +1,19 @@
 // src/App.tsx
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import { Tooltip as ReactTooltip } from 'react-tooltip';
 import { ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import { DollarSign, Users, Clock, Briefcase, Zap, Percent, RefreshCw } from 'lucide-react';
+import { DollarSign, Users, Clock, Briefcase, Zap, Percent, RefreshCw, AlertTriangle } from 'lucide-react';
+
+// --- Type for input validation errors ---
+type InputErrors = {
+  licenseCost?: string;
+  numUsers?: string;
+  hoursSaved?: string;
+  hourlyRate?: string;
+  implementationCost?: string;
+  timeToValue?: string;
+};
 
 // --- Reusable Input Component for a cleaner layout ---
 interface InputFieldProps {
@@ -12,38 +22,61 @@ interface InputFieldProps {
   value: number;
   setValue: (value: number) => void;
   isCurrency?: boolean;
+  min?: number;
+  errorMessage?: string;
+  tooltipContent?: string;
 }
 
-const InputField: React.FC<InputFieldProps> = ({ label, icon: Icon, value, setValue, isCurrency = false }) => (
-  <div>
-    <label className="block text-sm font-medium text-gray-400 mb-2">{label}</label>
-    <div className="relative group">
-      <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
-        {isCurrency ? (
-          <DollarSign className="h-5 w-5 text-gray-500" />
-        ) : (
-          <Icon className="h-5 w-5 text-gray-500" />
+const InputField: React.FC<InputFieldProps> = ({ label, icon: Icon, value, setValue, isCurrency = false, min, errorMessage, tooltipContent }) => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = parseFloat(e.target.value);
+    if (isNaN(val)) {
+      setValue(0); // Or handle as per preference, maybe keep old value or set to min
+    } else {
+      setValue(val);
+    }
+  };
+
+  return (
+    <div>
+      <label className="block text-sm font-medium text-gray-400 mb-2">{label}</label>
+      <div className="relative group">
+        <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
+          {isCurrency ? (
+            <DollarSign className="h-5 w-5 text-gray-500" />
+          ) : (
+            <Icon className="h-5 w-5 text-gray-500" />
+          )}
+        </div>
+        <input
+          type="number"
+          min={min}
+          step="any"
+          value={value === 0 && typeof value === 'number' ? '' : String(value)} // Allow empty string for 0, but keep number type
+          title={label}
+          onChange={handleChange}
+          className={`block w-full rounded-md border-gray-600 bg-gray-700/50 py-3 pl-10 pr-10 text-white shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm ${errorMessage ? 'border-red-500 ring-red-500' : ''}`}
+        />
+        {tooltipContent && (
+          <span
+            data-tooltip-id="tooltip"
+            data-tooltip-content={tooltipContent}
+            className="absolute right-3 top-1/2 transform -translate-y-1/2 text-xs text-gray-400 cursor-help"
+          >
+            ⓘ
+          </span>
         )}
       </div>
-      <input
-        type="number"
-        min="0"
-        step="any"
-        value={value === 0 ? '' : value}
-        title={label}
-        onChange={(e: React.ChangeEvent<HTMLInputElement>) => setValue(parseFloat(e.target.value) || 0)}
-        className="block w-full rounded-md border-gray-600 bg-gray-700/50 py-3 pl-10 pr-10 text-white shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" // Increased right padding
-      />
-      <span
-        data-tooltip-id="tooltip"
-        data-tooltip-content={`Info: ${label} – Enter the expected ${label.toLowerCase()} here.`}
-        className="absolute right-3 top-1/2 transform -translate-y-1/2 text-xs text-gray-400 cursor-help" // Adjusted right positioning
-      >
-        ⓘ
-      </span>
+      {errorMessage && (
+        <p className="mt-1 text-xs text-red-400 flex items-center">
+          <AlertTriangle className="h-4 w-4 mr-1" />
+          {errorMessage}
+        </p>
+      )}
     </div>
-  </div>
-);
+  );
+};
+
 
 // --- Reusable Output Card Component ---
 interface OutputCardProps {
@@ -73,43 +106,102 @@ export default function App() {
   const [hourlyRate, setHourlyRate] = useState(75);
   const [implementationCost, setImplementationCost] = useState(5000);
   const [timeToValue, setTimeToValue] = useState(3); // in months
+  const [pricingModel, setPricingModel] = useState<'monthly' | 'annual'>('monthly');
+  const [errors, setErrors] = useState<InputErrors>({});
+
+  // --- VALIDATION LOGIC ---
+  const validateInputs = useCallback(() => {
+    const newErrors: InputErrors = {};
+    if (licenseCost < 0) newErrors.licenseCost = "Cannot be negative.";
+    if (numUsers < 1) newErrors.numUsers = "Must be at least 1.";
+    if (hoursSaved < 0) newErrors.hoursSaved = "Cannot be negative.";
+    if (hourlyRate < 0) newErrors.hourlyRate = "Cannot be negative.";
+    if (implementationCost < 0) newErrors.implementationCost = "Cannot be negative.";
+    if (timeToValue < 0) newErrors.timeToValue = "Cannot be negative.";
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  }, [licenseCost, numUsers, hoursSaved, hourlyRate, implementationCost, timeToValue]);
 
   // --- DERIVED CALCULATIONS using useMemo for efficiency ---
   const calculations = useMemo(() => {
+    if (!validateInputs()) {
+      // Return default/error values if inputs are invalid
+      return {
+        annualSavings: NaN,
+        firstYearTotalCost: NaN,
+        annualROI: NaN,
+        paybackPeriodMonths: NaN,
+        annualNetValue: NaN,
+        annualLicenseCost: NaN,
+        totalSavingsOver3Years: NaN,
+        monthlyNetSavings: NaN, // Added for direct use
+      };
+    }
+
+    const actualLicenseCost = pricingModel === 'annual' ? licenseCost : licenseCost * 12;
+    const annualLicenseCost = actualLicenseCost * numUsers;
+
     const weeklySavingsPerUser = hoursSaved * hourlyRate;
     const totalWeeklySavings = weeklySavingsPerUser * numUsers;
     const annualSavings = totalWeeklySavings * 52;
 
-    const annualLicenseCost = licenseCost * numUsers * 12;
     const firstYearTotalCost = annualLicenseCost + implementationCost;
-
     const annualNetValue = annualSavings - annualLicenseCost;
-    const annualROI = firstYearTotalCost > 0 ? (annualNetValue / firstYearTotalCost) * 100 : 0;
+
+    // ROI calculation:
+    let annualROI = 0;
+    if (firstYearTotalCost > 0) {
+      annualROI = (annualNetValue / firstYearTotalCost) * 100;
+    } else if (annualNetValue > 0) {
+      annualROI = Infinity; // Infinite ROI if costs are zero and savings are positive
+    }
 
     const monthlyNetSavings = (annualSavings - annualLicenseCost) / 12;
-    const paybackPeriodMonths = implementationCost > 0 && monthlyNetSavings > 0
-      ? implementationCost / monthlyNetSavings
-      : 0;
 
-    const totalSavingsOver3Years = annualSavings * 3;
+    // Payback period calculation:
+    let paybackPeriodMonths = Infinity; // Default to never
+    if (monthlyNetSavings > 0) {
+      // Payback period is TTV + time to recoup implementation cost from net savings
+      paybackPeriodMonths = timeToValue + (implementationCost / monthlyNetSavings);
+    }
+
+    // Adjust annual savings for the first year based on Time-to-Value
+    const firstYearEffectiveMonthsOfSavings = Math.max(0, 12 - timeToValue);
+    const firstYearAdjustedSavings = annualSavings * (firstYearEffectiveMonthsOfSavings / 12);
+
+    // Total savings over 3 years, considering TTV for the first year
+    const totalSavingsOver3Years = firstYearAdjustedSavings + (annualSavings * 2);
+
 
     return {
-      annualSavings,
+      annualSavings, // This remains the full potential annual savings rate
+      firstYearAdjustedSavings, // Savings specifically for Year 1 after TTV
       firstYearTotalCost,
       annualROI,
       paybackPeriodMonths,
       annualNetValue,
       annualLicenseCost,
       totalSavingsOver3Years,
+      monthlyNetSavings, // expose for later use
     };
-  }, [licenseCost, numUsers, hoursSaved, hourlyRate, implementationCost, timeToValue]);
+  }, [licenseCost, numUsers, hoursSaved, hourlyRate, implementationCost, timeToValue, pricingModel, validateInputs]);
 
   // --- DATA FOR THE CHART ---
   const chartData = useMemo(() => {
+    if (isNaN(calculations.firstYearTotalCost)) { // Check if calculations are valid
+      return [
+        { name: 'Year 1', Cost: 0, Savings: 0, 'Net Value': 0 },
+        { name: 'Year 2', Cost: 0, Savings: 0, 'Net Value': 0 },
+        { name: 'Year 3', Cost: 0, Savings: 0, 'Net Value': 0 },
+      ];
+    }
+
+    const year1NetValue = calculations.firstYearAdjustedSavings - calculations.firstYearTotalCost;
+
     return [
-      { name: 'Year 1', Cost: calculations.firstYearTotalCost, Savings: calculations.annualSavings, 'Net Value': calculations.annualSavings - calculations.firstYearTotalCost },
-      { name: 'Year 2', Cost: calculations.annualLicenseCost, Savings: calculations.annualSavings, 'Net Value': calculations.annualNetValue },
-      { name: 'Year 3', Cost: calculations.annualLicenseCost, Savings: calculations.annualSavings, 'Net Value': calculations.annualNetValue },
+      { name: 'Year 1', Cost: calculations.firstYearTotalCost, Savings: calculations.firstYearAdjustedSavings, 'Net Value': year1NetValue },
+      { name: 'Year 2', Cost: calculations.annualLicenseCost, Savings: calculations.annualSavings, 'Net Value': calculations.annualNetValue }, // Year 2 uses full annual savings
+      { name: 'Year 3', Cost: calculations.annualLicenseCost, Savings: calculations.annualSavings, 'Net Value': calculations.annualNetValue }, // Year 3 uses full annual savings
     ];
   }, [calculations]);
 
@@ -150,12 +242,82 @@ export default function App() {
             <div className="lg:col-span-1 bg-gray-800/50 p-6 rounded-2xl border border-gray-700">
               <h2 className="text-2xl font-bold mb-6 border-b border-gray-700 pb-4">Input Metrics</h2>
               <div className="space-y-6">
-                <InputField label="License Cost per User/Month" icon={DollarSign} value={licenseCost} setValue={setLicenseCost} isCurrency />
-                <InputField label="Number of Users" icon={Users} value={numUsers} setValue={setNumUsers} />
-                <InputField label="Avg. Hours Saved per User/Week" icon={Clock} value={hoursSaved} setValue={setHoursSaved} />
-                <InputField label="Avg. Employee Hourly Rate" icon={Briefcase} value={hourlyRate} setValue={setHourlyRate} isCurrency />
-                <InputField label="One-Time Implementation Cost" icon={Zap} value={implementationCost} setValue={setImplementationCost} isCurrency />
-                <InputField label="Time-to-Value (Months)" icon={RefreshCw} value={timeToValue} setValue={setTimeToValue} />
+                {/* Pricing Model Toggle */}
+                <div className="flex items-center justify-between">
+                  <label className="block text-sm font-medium text-gray-400">Pricing Model</label>
+                  <div className="flex items-center">
+                    <button
+                      onClick={() => setPricingModel('monthly')}
+                      className={`px-3 py-1 text-sm rounded-l-md ${pricingModel === 'monthly' ? 'bg-indigo-600 text-white' : 'bg-gray-700 hover:bg-gray-600'}`}
+                    >
+                      Monthly
+                    </button>
+                    <button
+                      onClick={() => setPricingModel('annual')}
+                      className={`px-3 py-1 text-sm rounded-r-md ${pricingModel === 'annual' ? 'bg-indigo-600 text-white' : 'bg-gray-700 hover:bg-gray-600'}`}
+                    >
+                      Annual
+                    </button>
+                  </div>
+                </div>
+
+                <InputField
+                  label={`License Cost per User/${pricingModel === 'monthly' ? 'Month' : 'Year'}`}
+                  icon={DollarSign}
+                  value={licenseCost}
+                  setValue={setLicenseCost}
+                  isCurrency
+                  min={0}
+                  errorMessage={errors.licenseCost}
+                  tooltipContent={`Enter the license cost per user, billed ${pricingModel}.`}
+                />
+                <InputField
+                  label="Number of Users"
+                  icon={Users}
+                  value={numUsers}
+                  setValue={setNumUsers}
+                  min={1}
+                  errorMessage={errors.numUsers}
+                  tooltipContent="Enter the total number of users for the software."
+                />
+                <InputField
+                  label="Avg. Hours Saved per User/Week"
+                  icon={Clock}
+                  value={hoursSaved}
+                  setValue={setHoursSaved}
+                  min={0}
+                  errorMessage={errors.hoursSaved}
+                  tooltipContent="Estimate the average hours saved each week per user due to the new software."
+                />
+                <InputField
+                  label="Avg. Employee Hourly Rate"
+                  icon={Briefcase}
+                  value={hourlyRate}
+                  setValue={setHourlyRate}
+                  isCurrency
+                  min={0}
+                  errorMessage={errors.hourlyRate}
+                  tooltipContent="Enter the average fully-loaded hourly rate of the employees using the software."
+                />
+                <InputField
+                  label="One-Time Implementation Cost"
+                  icon={Zap}
+                  value={implementationCost}
+                  setValue={setImplementationCost}
+                  isCurrency
+                  min={0}
+                  errorMessage={errors.implementationCost}
+                  tooltipContent="Include all one-time costs: setup, training, migration, etc."
+                />
+                <InputField
+                  label="Time-to-Value (Months)"
+                  icon={RefreshCw}
+                  value={timeToValue}
+                  setValue={setTimeToValue}
+                  min={0}
+                  errorMessage={errors.timeToValue}
+                  tooltipContent="How many months until the software is fully implemented and savings begin."
+                />
               </div>
             </div>
 
@@ -163,9 +325,24 @@ export default function App() {
             <div className="lg:col-span-2 space-y-8">
               {/* --- OUTPUT CARDS --- */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
-                <OutputCard title="Annual Recurring Savings" value={formatCurrency(calculations.annualSavings)} icon={DollarSign} color="bg-green-500/80" />
-                <OutputCard title="Payback Period (Months)" value={calculations.paybackPeriodMonths.toFixed(1)} icon={RefreshCw} color="bg-blue-500/80" />
-                <OutputCard title="First Year ROI" value={`${calculations.annualROI.toFixed(1)}%`} icon={Percent} color="bg-indigo-500/80" />
+                <OutputCard
+                  title="Annual Recurring Savings"
+                  value={isNaN(calculations.annualSavings) ? "N/A" : formatCurrency(calculations.annualSavings)}
+                  icon={DollarSign}
+                  color="bg-green-500/80"
+                />
+                <OutputCard
+                  title="Payback Period (Months)"
+                  value={isNaN(calculations.paybackPeriodMonths) ? "N/A" : calculations.paybackPeriodMonths === Infinity ? "Never" : calculations.paybackPeriodMonths.toFixed(1)}
+                  icon={RefreshCw}
+                  color="bg-blue-500/80"
+                />
+                <OutputCard
+                  title="First Year ROI"
+                  value={isNaN(calculations.annualROI) ? "N/A" : calculations.annualROI === Infinity ? "Infinite %" : `${calculations.annualROI.toFixed(1)}%`}
+                  icon={Percent}
+                  color="bg-indigo-500/80"
+                />
               </div>
 
               {/* --- CHART SECTION --- */}
